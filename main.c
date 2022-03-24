@@ -66,6 +66,10 @@ int encrypt_file(char* filename , int offset)
 
     rename(filename, new_filename);
 
+    free(temp);
+    free(new_filename);
+
+
     return 0;
 }
 
