@@ -1,5 +1,16 @@
 
 
+
+lfo
+
+*.o
+
+
 *.txt
 *.jpg
 *.jpeg
+
+data/
+
+
+
