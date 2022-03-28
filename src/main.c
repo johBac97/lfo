@@ -4,10 +4,15 @@
 #include<errno.h>
 #include<unistd.h>
 #include<time.h>
+#include<dirent.h>
+
 
 #include<sys/stat.h>
 
 
+// LIGHT FILE OBFUSCATOR
+
+#define BUFFER_SIZE (512)
 #define SCRAMBLED_OFFSET    (1)
 #define LENGTH_SCRAMBLED_FILENAME   (5)
 
@@ -16,26 +21,26 @@ struct settings {
     char* target;
     short unsigned is_dir;
     short unsigned keep_name; 
-    short unsigned encrypt;
+    short unsigned scramble;
     short unsigned scramble_offset;
     char* dir;
 };
 
 
-int encrypt_file(struct settings *s) 
+int scramble_file(struct settings *s) 
 {
     // Encrypts file with ceaser cipher
     
     // Function assumes we are in same dir as file
     
     FILE *f;
-    int c, offset; 
+    int  i; 
     char* temp;
     char* new_filename;
-    char* filename;
+    char* filename, * buffer;
+    size_t n_read;
 
     filename = s->target;
-    offset = s->scramble_offset;
 
     f = fopen(filename, "r+");
 
@@ -61,15 +66,22 @@ int encrypt_file(struct settings *s)
     fputc( (unsigned)strlen(filename) , f);
     fseek(f , 0 , SEEK_SET);
 
-    while ( ( c = fgetc(f)) != EOF) {
-        // Increment byte with offset, if larger than 255 do modulo
-        c = (c + offset) % 256;
+    buffer = malloc(BUFFER_SIZE);
 
-        // Move cursor back one step and write
-        fseek(f , -1 , SEEK_CUR);
+    do {
+        // Read current contents
+        n_read = fread(buffer, 1 , BUFFER_SIZE, f);
+        
+        // Alter buffer 
+        for ( i = 0; i < n_read; i++)
+            buffer[i] = (buffer[i] + s->scramble_offset ) % 256;
 
-        fputc(c , f ); 
-    }
+        // write back to file
+        fseek(f , -n_read , SEEK_CUR);
+
+        fwrite(buffer, 1, n_read, f);
+
+    } while( n_read == BUFFER_SIZE);
 
     // Now finally add 8 bytes identifying that this file is scrambled
     fputs("scrambled", f);
@@ -79,32 +91,32 @@ int encrypt_file(struct settings *s)
 
     // Now generate new random filename
     new_filename = malloc(LENGTH_SCRAMBLED_FILENAME + 1); 
-    for (int i = 0; i < LENGTH_SCRAMBLED_FILENAME; i++)
+    for (i = 0; i < LENGTH_SCRAMBLED_FILENAME; i++)
         new_filename[i] = rand() % 26 + 'a';
     new_filename[LENGTH_SCRAMBLED_FILENAME] = '\0';
 
-    rename(filename, new_filename);
+    rename(filename , new_filename);
 
     free(temp);
     free(new_filename);
-
 
     return 0;
 }
 
 
-int decrypt_file(struct settings *s) 
+int unscramble_file(struct settings *s) 
 {
     // Encrypts file with ceaser cipher
     
     FILE *f;
-    int c, offset; 
-    size_t filename_length;
+    int  i; 
+    size_t filename_length, n_read;
     char* orig_filename, *temp, *filename;
     long file_length;
+    char* buffer;
+
 
     filename = s->target;
-    offset = s->scramble_offset;
 
     
     f = fopen(filename, "r+");
@@ -134,16 +146,22 @@ int decrypt_file(struct settings *s)
     // reset cursor  
     fseek(f , 0 , SEEK_SET);
 
-    // will read and "unscramble" filename as well but doesnt matter file is truncated later
-    while ( ( c = fgetc(f)) != EOF) {
-        // Increment byte with offset, if larger than 255 do modulo
-        c = (c - offset + 256 ) % 256;
+    buffer = malloc(BUFFER_SIZE);
 
-        // Move cursor back one step and write
-        fseek(f , -1 , SEEK_CUR);
+    do {
+        // Read current contents
+        n_read = fread(buffer, 1 , BUFFER_SIZE, f);
+        
+        // Alter buffer 
+        for ( i = 0; i < n_read; i++)
+            buffer[i] = (buffer[i] - s->scramble_offset + 256) % 256;
 
-        fputc(c , f ); 
-    }
+        // write back to file
+        fseek(f , -n_read , SEEK_CUR);
+
+        fwrite(buffer, 1, n_read, f);
+
+    } while( n_read == BUFFER_SIZE);
 
     fseek(f , -10 , SEEK_END);
    
@@ -165,9 +183,137 @@ int decrypt_file(struct settings *s)
 
     free(orig_filename);
     free(temp);
+    free(buffer);
 
     return 0;
 }
+
+int scramble_dir(struct settings *s)
+{
+    int i;
+    DIR *d;
+    struct dirent *ep; 
+    struct settings *s_next; 
+    char* new_dir_name , *original_dir_name ;
+    FILE *f;
+
+    // Get contents of directory
+    d = opendir(s->target);
+
+    if (d == NULL) {
+        // Unable to read contents of directory
+        return 1;
+    }
+    
+    // Move to new dir
+    chdir(s->target);
+
+    // Allocate settings for next target
+    s_next = malloc(sizeof(struct settings));
+    s_next->target = malloc(PATH_MAX);
+    s_next->dir = malloc(PATH_MAX);
+
+
+    // Loop over all directory entries and scramble them
+    // Do it recursivly for directoris
+    while (( ep = readdir(d)) ) {
+       
+
+        // Set file type and check if skip
+        if ((ep->d_type == DT_LNK) || (strcmp(ep->d_name, "..") == 0) || (strcmp(ep->d_name,".") == 0)) {
+            // Don't follow sym links and skip special directories
+            continue;
+        } else if ( ep->d_type == DT_REG) {
+            s_next->is_dir = 0;
+        } else if ( ep->d_type == DT_DIR) {
+            s_next->is_dir = 1;
+        } else {
+            printf("encounterd unknown file:\t%d\n" , ep->d_type);
+            exit(1);
+        }
+
+        // Set the filename   
+        strcpy(s_next->target, ep->d_name);
+        s_next->scramble = s->scramble; 
+
+        strcpy(s_next->dir, s->target);
+
+        s_next->scramble_offset = s->scramble_offset;
+
+        s_next->keep_name = 0;
+
+        // If it is a directory continue recursivly otherwise scramble/unscramble file
+        if (s_next->is_dir) {
+            scramble_dir(s_next);
+        } else {
+            if ( s_next->scramble)
+                scramble_file(s_next);
+            else 
+                unscramble_file(s_next);
+        }
+    }
+   
+    
+
+    // Check if we should rename the directory
+    if (s->scramble && !s->keep_name) {
+
+        // first we need to store original name somewhere 
+        f = fopen(".original_dir_name" , "w");
+        fputs(s->target , f); //Original name
+        fclose(f);
+
+        // now scramble that file
+        strcpy(s_next->target, ".original_dir_name");
+        scramble_file(s_next);
+
+        new_dir_name = malloc(LENGTH_SCRAMBLED_FILENAME + 1); 
+        for (i = 0; i < LENGTH_SCRAMBLED_FILENAME; i++)
+            new_dir_name[i] = rand() % 26 + 'a';
+        new_dir_name[LENGTH_SCRAMBLED_FILENAME] = '\0';
+
+        // Move up
+        chdir("..");
+
+        rename(s->target ,  new_dir_name);
+
+        free(new_dir_name);
+    } else if (!s->scramble) {
+        // Unscramble dir name
+
+        original_dir_name = malloc(PATH_MAX);
+
+        // Look for file containing original directory name
+        f = fopen(".original_dir_name", "r");
+        if (f == NULL) {
+            // Unable to find file, this directgory was not name scrambled
+            chdir("..");  
+        } else {
+            fread(original_dir_name , 1, PATH_MAX, f);
+            fclose(f);
+           
+            // remove excess file
+            remove(".original_dir_name");
+
+            chdir("..");
+            
+            // rename it back to original
+            rename(s->target , original_dir_name);
+        }
+
+        free(original_dir_name);
+    } else
+        chdir("..");
+
+
+    // Free up memory 
+    free(s_next->target);
+    free(s_next->dir);
+    free(s_next); 
+
+    return 0;
+}
+
 
 
 int parse_arguments(int argc, char* argv[], struct settings* s)
@@ -183,9 +329,9 @@ int parse_arguments(int argc, char* argv[], struct settings* s)
 
     // Check if valid flag
     if (strcmp(argv[1] , "-e") == 0) {
-        s->encrypt = 1;
+        s->scramble = 1;
     } else if (strcmp(argv[1] , "-d") == 0) {
-        s->encrypt = 0;
+        s->scramble = 0;
     } else {
         // Invalid flag
         return 3;
@@ -194,11 +340,11 @@ int parse_arguments(int argc, char* argv[], struct settings* s)
 
     // Record parent directory 
     indx = rindex(argv[2] , '/');  
-    s->dir = malloc(256);
-    s->target = malloc(256);
+    s->dir = malloc(PATH_MAX);
+    s->target = malloc(PATH_MAX);
 
     if (indx == NULL){
-        getcwd(s->dir , 0);
+        getcwd(s->dir , PATH_MAX);
         strcpy(s->target ,argv[2]);
     } else {
         filename_length = (indx - argv[2]);
@@ -262,18 +408,18 @@ int main(int argc, char* argv[] )
     
     if (s->is_dir){
         // TODO
-         
+        status = scramble_dir(s);
     } else {
         
         // TODO - If already in current directory dont move 
         chdir(s->dir);
 
-        if (s->encrypt) {
-            status = encrypt_file(s);
+        if (s->scramble) {
+            status = scramble_file(s);
         } else {
-            status = decrypt_file(s);
+            status = unscramble_file(s);
         }
     }
 
-    return 0;
+    return status;
 }
