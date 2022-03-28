@@ -2,7 +2,7 @@
 
 
 CC=gcc
-CCFLAGS=-g -O0
+CFLAGS=-g -O0 -Wall --pedantic-errors
 
 objs=lfo
 
