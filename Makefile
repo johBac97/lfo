@@ -15,7 +15,11 @@ lfo: src/main.o
 time_exec: src/time_exec.o
 	$(CC) $(CCFLAGS) src/time_exec.o -o time_exec
 
-.PHONY: clean copy
+.PHONY: clean copy install
+
+install: all
+	mkdir bin
+	cp lfo bin/
 
 copy:
 	cp -r data data2
