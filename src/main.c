@@ -12,7 +12,7 @@
 
 // LIGHT FILE OBFUSCATOR
 
-#define BUFFER_SIZE (1024)
+#define BUFFER_SIZE (2048)
 #define SCRAMBLED_OFFSET    (100)
 #define LENGTH_SCRAMBLED_FILENAME   (15)
 
@@ -65,6 +65,11 @@ int scramble_file(struct settings *s)
     // First add filename to end of file along with the length of the filename
     fseek(f , 0 , SEEK_END);
     fputs(filename , f);  
+
+    // get file size
+    //file_size = ftell(f);
+    
+
     fputc( (unsigned)strlen(filename) , f);
     fseek(f , 0 , SEEK_SET);
 
@@ -258,14 +263,10 @@ int scramble_dir(struct settings *s)
         }
     }
    
-    
-
     // Check if we should rename the directory
     // If the ".original_dir_name" file is present then don't scramble dir name
     if (s->scramble && !s->keep_name && access(".original_dir_name" , F_OK) != 0) {
 
-        
-        
         // first we need to store original name somewhere 
         f = fopen(".original_dir_name" , "w");
         fputs(s->target , f); //Original name
@@ -317,7 +318,6 @@ int scramble_dir(struct settings *s)
         free(original_dir_name);
     } else
         chdir("..");
-
 
     // Free up memory 
     free(s_next->target);

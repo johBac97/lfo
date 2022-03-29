@@ -2,14 +2,18 @@
 
 
 CC=gcc
-CFLAGS=-g -O0 -Wall --pedantic-errors
+CFLAGS=-g -O2 -Wall --pedantic-errors
 
-objs=lfo
+objs = lfo time_exec
 
+
+all: $(objs)
 
 lfo: src/main.o
 	$(CC) $(CCFLAGS) src/main.o -o lfo
 
+time_exec: src/time_exec.o
+	$(CC) $(CCFLAGS) src/time_exec.c -o time_exec
 
 .PHONY: clean copy
 
@@ -18,4 +22,4 @@ copy:
 
 clean:
 	rm -f src/*.o
-	rm -r data2
+	rm -fr data2
