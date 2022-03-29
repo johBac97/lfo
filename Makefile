@@ -11,9 +11,11 @@ lfo: src/main.o
 	$(CC) $(CCFLAGS) src/main.o -o lfo
 
 
-.PHONY: clean
+.PHONY: clean copy
 
-
+copy:
+	cp -r data data2
 
 clean:
-	rm  src/*.o
+	rm -f src/*.o
+	rm -r data2

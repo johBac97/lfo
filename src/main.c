@@ -12,9 +12,9 @@
 
 // LIGHT FILE OBFUSCATOR
 
-#define BUFFER_SIZE (512)
-#define SCRAMBLED_OFFSET    (1)
-#define LENGTH_SCRAMBLED_FILENAME   (5)
+#define BUFFER_SIZE (1024)
+#define SCRAMBLED_OFFSET    (100)
+#define LENGTH_SCRAMBLED_FILENAME   (15)
 
 
 struct settings {
@@ -27,12 +27,12 @@ struct settings {
 };
 
 
+/*
+ * Scrambles the contents of a file with a Ceasar cipher. Assumes file path is in current dir.
+ */
 int scramble_file(struct settings *s) 
 {
-    // Encrypts file with ceaser cipher
-    
-    // Function assumes we are in same dir as file
-    
+     
     FILE *f;
     int  i; 
     char* temp;
@@ -46,13 +46,15 @@ int scramble_file(struct settings *s)
 
     // Check if we were able to open the file
     if (f == NULL) {
-        printf("Unable to open file:\t%d\n" , errno);
+        // Unable to open file
         return 1; // ERROR
     }
 
 
     temp = malloc(12);
-    
+   
+    // At end of each scrambled file these sentry bytes are. 
+    // If they are present the file is already scrambled 
     fseek(f, -9 , SEEK_END);
     fgets(temp , 10 , f);
     if (strcmp(temp , "scrambled") == 0) {
@@ -60,7 +62,7 @@ int scramble_file(struct settings *s)
         return 2;
     }
 
-    // First add filename to end of file along with the legnth of the filename
+    // First add filename to end of file along with the length of the filename
     fseek(f , 0 , SEEK_END);
     fputs(filename , f);  
     fputc( (unsigned)strlen(filename) , f);
@@ -89,16 +91,18 @@ int scramble_file(struct settings *s)
     // Close file
     fclose(f); 
 
-    // Now generate new random filename
-    new_filename = malloc(LENGTH_SCRAMBLED_FILENAME + 1); 
-    for (i = 0; i < LENGTH_SCRAMBLED_FILENAME; i++)
-        new_filename[i] = rand() % 26 + 'a';
-    new_filename[LENGTH_SCRAMBLED_FILENAME] = '\0';
+    // If enabled scramble the filename as well
+    if (!s->keep_name) {
+        new_filename = malloc(LENGTH_SCRAMBLED_FILENAME + 1); 
+        for (i = 0; i < LENGTH_SCRAMBLED_FILENAME; i++)
+            new_filename[i] = rand() % 26 + 'a';
+        new_filename[LENGTH_SCRAMBLED_FILENAME] = '\0';
 
-    rename(filename , new_filename);
+        rename(filename , new_filename);
+        free(new_filename);
+    }
 
     free(temp);
-    free(new_filename);
 
     return 0;
 }
@@ -196,6 +200,7 @@ int scramble_dir(struct settings *s)
     struct settings *s_next; 
     char* new_dir_name , *original_dir_name ;
     FILE *f;
+    size_t n_read;
 
     // Get contents of directory
     d = opendir(s->target);
@@ -256,8 +261,11 @@ int scramble_dir(struct settings *s)
     
 
     // Check if we should rename the directory
-    if (s->scramble && !s->keep_name) {
+    // If the ".original_dir_name" file is present then don't scramble dir name
+    if (s->scramble && !s->keep_name && access(".original_dir_name" , F_OK) != 0) {
 
+        
+        
         // first we need to store original name somewhere 
         f = fopen(".original_dir_name" , "w");
         fputs(s->target , f); //Original name
@@ -265,6 +273,8 @@ int scramble_dir(struct settings *s)
 
         // now scramble that file
         strcpy(s_next->target, ".original_dir_name");
+        s_next->keep_name = 1;
+
         scramble_file(s_next);
 
         new_dir_name = malloc(LENGTH_SCRAMBLED_FILENAME + 1); 
@@ -289,9 +299,12 @@ int scramble_dir(struct settings *s)
             // Unable to find file, this directgory was not name scrambled
             chdir("..");  
         } else {
-            fread(original_dir_name , 1, PATH_MAX, f);
+            n_read = fread(original_dir_name , 1, PATH_MAX, f);
             fclose(f);
-           
+            
+            // Add null byte 
+            original_dir_name[n_read] = '\0';
+
             // remove excess file
             remove(".original_dir_name");
 
