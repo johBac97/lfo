@@ -12,10 +12,13 @@
 
 // LIGHT FILE OBFUSCATOR
 
-#define BUFFER_SIZE (2048)
-#define SCRAMBLED_OFFSET    (100)
+#define BUFFER_SIZE                 (512)
+#define SCRAMBLED_OFFSET            (100)
 #define LENGTH_SCRAMBLED_FILENAME   (15)
 
+#define BYTES_OFFSET                (2048)
+#define NUMBER_INITIAL_ROUNDS       (10)
+#define FILE_SIZE_LIMIT             (8192)
 
 struct settings {
     char* target;
@@ -24,6 +27,8 @@ struct settings {
     short unsigned scramble;
     short unsigned scramble_offset;
     char* dir;
+    unsigned initial_rounds;
+    unsigned bytes_offset;
 };
 
 
@@ -39,6 +44,9 @@ int scramble_file(struct settings *s)
     char* new_filename;
     char* filename, * buffer;
     size_t n_read;
+    
+
+
 
     filename = s->target;
 
@@ -68,7 +76,8 @@ int scramble_file(struct settings *s)
 
     // get file size
     //file_size = ftell(f);
-    
+   
+     
 
     fputc( (unsigned)strlen(filename) , f);
     fseek(f , 0 , SEEK_SET);
