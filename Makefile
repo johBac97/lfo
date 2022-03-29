@@ -2,7 +2,7 @@
 
 
 CC=gcc
-CFLAGS=-g -O2 -Wall --pedantic-errors
+CFLAGS=-g -O2 -Wall 
 
 objs = lfo time_exec
 
@@ -13,7 +13,7 @@ lfo: src/main.o
 	$(CC) $(CCFLAGS) src/main.o -o lfo
 
 time_exec: src/time_exec.o
-	$(CC) $(CCFLAGS) src/time_exec.c -o time_exec
+	$(CC) $(CCFLAGS) src/time_exec.o -o time_exec
 
 .PHONY: clean copy
 

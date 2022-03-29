@@ -26,10 +26,12 @@ int main(int argc, char* argv[])
     // TODO - Should propbably check that we are in correct dir
     
     // Make clean
-    system("make -s clean"); 
+    if (system("make -s clean") != 0)
+        printf("Make error\n");
 
     // make copy
-    system("make -s copy");
+    if (system("make -s copy") != 0)
+        printf("Make error\n");
 
     // TODO - Check that output is correct 
     // Do intitial run to check that program works correctly 
@@ -57,7 +59,7 @@ int main(int argc, char* argv[])
         // Count time of execution
         t = time(NULL);
 
-        system("./lfo -e data2");
+        status_sc += system("./lfo -e data2");
        
         t = time(NULL) - t;
         
@@ -65,17 +67,21 @@ int main(int argc, char* argv[])
         
         t = time(NULL);
 
-        system("./lfo -d data2");
+        status_un += system("./lfo -d data2");
 
         t = time(NULL) - t;
 
         tot_un_time += (double)t;
-
     }
 
+    if (status_sc == 0 && status_un == 0)
+        printf("No lfo errors during exection.\n");
+    else
+        printf("Cumulative lfo errors during exection:\t%d" , status_sc + status_un);
+
     // Count mean execution time
-    printf("Mean scramble execution time:\t%2.4f\n", tot_sc_time / ( (double) n_runs));
-    printf("Mean unscramble execution time:\t%2.4f\n", tot_un_time / ( (double) n_runs));
-    
+    printf("Mean scramble execution time:\t%2.8f\n", tot_sc_time / ( (double) n_runs));
+    printf("Mean unscramble execution time:\t%2.8f\n", tot_un_time / ( (double) n_runs));
+   
     return 0;
 }
