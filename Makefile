@@ -2,7 +2,7 @@
 
 
 CC= gcc
-CFLAGS= -O3 -Wall -Wextra --pedantic-errors
+CFLAGS= -O2 -Wall -Wextra --pedantic-errors
 
 objs = lfo time_exec
 
