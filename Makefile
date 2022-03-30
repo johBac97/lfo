@@ -1,8 +1,8 @@
 #!/usr/bin/make -f 
 
 
-CC=gcc
-CFLAGS=-g -O2 -Wall 
+CC= gcc
+CFLAGS= -O3 -Wall -Wextra --pedantic-errors
 
 objs = lfo time_exec
 
@@ -18,7 +18,7 @@ time_exec: src/time_exec.o
 .PHONY: clean copy install
 
 install: all
-	mkdir bin
+	mkdir -p bin
 	cp lfo bin/
 
 copy:

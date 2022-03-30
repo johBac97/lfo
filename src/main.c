@@ -14,8 +14,8 @@
 
 #define BUFFER_SIZE                 (4096)
 #define SCRAMBLED_OFFSET            (99)
-#define LENGTH_SCRAMBLED_FILENAME   (15)
-#define NUMBER_ROUNDS               (10)
+#define LENGTH_SCRAMBLED_FILENAME   (10)
+#define NUMBER_ROUNDS               (30)
 
 struct settings {
     char* target;
@@ -35,13 +35,12 @@ int scramble_file(struct settings *s)
 {
      
     FILE *f;
-    int  i; 
     long file_size;
     unsigned n_rounds;
     char* temp;
     char* new_filename;
     char* filename, * buffer;
-    size_t n_read;
+    size_t n_read , i;
     
     filename = s->target;
 
@@ -49,7 +48,12 @@ int scramble_file(struct settings *s)
 
     // Check if we were able to open the file
     if (f == NULL) {
-        // Unable to open file
+
+        // Access denied
+        if ( errno == EACCES) 
+            printf("Permission denied:\t%s\n" , filename);
+         
+        errno = 0;
         return 1; // ERROR
     }
 
@@ -137,22 +141,24 @@ int unscramble_file(struct settings *s)
     // Encrypts file with ceaser cipher
     
     FILE *f;
-    int  i; 
     unsigned n_rounds;
-    size_t filename_length, n_read;
+    size_t filename_length, n_read , i;
     char* orig_filename, *temp, *filename;
     long file_size;
     char* buffer;
 
-
     filename = s->target;
-
     
     f = fopen(filename, "r+");
 
     // Check if we were able to open the file
     if (f == NULL) {
-        printf("Unable to open file:\t%d\n" , errno);
+
+        // Access denied
+        if (errno == EACCES) 
+            printf("%s:\tPermission denied\n", filename);
+
+        errno = 0;
         return 1;  // ERROR: unable to open file
     }
 
@@ -428,12 +434,27 @@ int parse_arguments(int argc, char* argv[], struct settings* s)
     status = stat(argv[2] , st);
    
     if (status == -1){
-        // Target does not exist
-        free(st);
-        free(s->dir);
-        free(s->target);
-        free(s);
-        return 2;
+        
+        if (errno == ENOENT){
+            // Target does not exist
+            free(st);
+            free(s->dir);
+            free(s->target);
+            free(s);
+            errno = 0;
+            return 2;
+        } else if (errno == EACCES){
+            // Search permission denied 
+            free(st);
+            free(s->dir);
+            free(s->target);
+            free(s);
+            return 4;
+        } else {
+            perror("Unknown error:\t");
+            return 5;
+        }
+        
     } 
 
     // Check if directory or regular file
@@ -466,28 +487,28 @@ int main(int argc, char* argv[] )
 
     if (status == 1) {
         // Wrong number of arguments
-        printf("Usage:\t%s <-e|-d> filename\n" , argv[0]);
+        printf("Usage:\t%s <-e|-d> target\n" , argv[0]);
         free(s);
         return 1;
     } else if ( status == 2) {
         // Target does not exist
-        printf("Unable to open target\n");
-        free(s);
+        printf("Target does not exist:\t%s\n", argv[2]);
         return 2;
     } else if (status == 3) {
         printf("Invalid flag:\t%s\n" , argv[1]);
         free(s);
         return 3;
+    } else if (status == 4) {
+        printf("Access denied!\n");
+        return 4;
     }
 
     // Seed random number generator
     srand( (unsigned) time(&t)); 
     
     if (s->is_dir){
-        // TODO
         status = scramble_dir(s);
     } else {
-        
         // TODO - If already in current directory dont move 
         if (chdir(s->dir) != 0 ) 
             perror("Unable to change directory");
