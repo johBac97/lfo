@@ -23,7 +23,6 @@ struct settings {
     short unsigned keep_name; 
     short unsigned scramble;
     short unsigned scramble_offset;
-    char* dir;
     unsigned n_rounds;
 };
 
@@ -257,16 +256,10 @@ int scramble_dir(struct settings *s)
     // Allocate settings for next target
     s_next = malloc(sizeof(struct settings));
     s_next->target = malloc(PATH_MAX);
-    s_next->dir = malloc(PATH_MAX);
-
-    s_next->dir = strcpy(s_next->dir, s->target);
-    if (s_next->dir == NULL) 
-        perror("Unable to set target dir");
 
     // Loop over all directory entries and scramble them
     // Do it recursivly for directoris
     while (( ep = readdir(d)) ) {
-       
 
         // Set file type and check if skip
         if ((ep->d_type == DT_LNK) || (strcmp(ep->d_name, "..") == 0) || (strcmp(ep->d_name,".") == 0)) {
@@ -380,7 +373,6 @@ int scramble_dir(struct settings *s)
     }
     // Free up memory 
     free(s_next->target);
-    free(s_next->dir);
     free(s_next); 
 
     return 0;
@@ -391,9 +383,9 @@ int scramble_dir(struct settings *s)
 int parse_arguments(int argc, char* argv[], struct settings* s)
 {
     int status;
-    char* indx;
     struct stat *st;
-    int filename_length;
+    char *dir , *indx;
+    size_t target_name_len;  
 
     // First check if valid number of argumnets
     if (argc != 3)
@@ -409,36 +401,45 @@ int parse_arguments(int argc, char* argv[], struct settings* s)
         return 3;
     }
 
-
-    // Record parent directory 
-    indx = rindex(argv[2] , '/');  
-    s->dir = malloc(PATH_MAX);
     s->target = malloc(PATH_MAX);
-
-    if (indx == NULL){
-        s->dir = getcwd(s->dir , PATH_MAX);
-        if (s->dir == NULL) 
-            perror("Unable to get working directory");
+  
+    // If an additional '/' at end of target remove it 
+    target_name_len = strlen( argv[2]);
+    if ( argv[2][target_name_len - 1] == '/') 
+        argv[2][target_name_len -1] = '\0';
         
-        strcpy(s->target ,argv[2]);
-    } else {
-        filename_length = (indx - argv[2]);
-        strncpy(s->dir , argv[2] , filename_length); 
-        s->dir[filename_length + 1] = '\0';
 
-        strcpy(s->target, argv[2] + filename_length + 1);
-    } 
+
+    // Move to directory and store relative filename
+    indx = rindex(argv[2] , '/');
+    if (indx != NULL) {
+        // move to directory
+        dir = malloc(PATH_MAX);
+        dir = strncpy(dir, argv[2], (indx - argv[2]));
+        if (chdir(dir) != 0) {
+            perror("Unable to change directory");
+            errno = 0;
+        }
+        free(dir);
+        // Store file name
+        s->target = strcpy(s->target, indx + 1);
+    } else {
+        // target is in same folder just copy name
+        s->target = strcpy(s->target, argv[2]);
+
+    }
+       
+    
 
     // Then read file metadata
     st = malloc(sizeof(struct stat));
-    status = stat(argv[2] , st);
+    status = stat(s->target , st);
    
     if (status == -1){
         
         if (errno == ENOENT){
             // Target does not exist
             free(st);
-            free(s->dir);
             free(s->target);
             free(s);
             errno = 0;
@@ -446,7 +447,6 @@ int parse_arguments(int argc, char* argv[], struct settings* s)
         } else if (errno == EACCES){
             // Search permission denied 
             free(st);
-            free(s->dir);
             free(s->target);
             free(s);
             return 4;
@@ -480,14 +480,14 @@ int main(int argc, char* argv[] )
     int status;
     time_t t;
     struct settings *s;
-    
+
     // Allocate settings and parse argumnets
     s = malloc(sizeof(struct settings));
     status = parse_arguments(argc, argv, s);
 
     if (status == 1) {
         // Wrong number of arguments
-        printf("Usage:\t%s <-e|-d> target\n" , argv[0]);
+        printf("Usage:\t%s [ -e | -d ] target\n" , argv[0]);
         free(s);
         return 1;
     } else if ( status == 2) {
@@ -509,9 +509,6 @@ int main(int argc, char* argv[] )
     if (s->is_dir){
         status = scramble_dir(s);
     } else {
-        // TODO - If already in current directory dont move 
-        if (chdir(s->dir) != 0 ) 
-            perror("Unable to change directory");
 
         if (s->scramble) {
             status = scramble_file(s);
@@ -520,7 +517,6 @@ int main(int argc, char* argv[] )
         }
     }
     
-    free(s->dir);
     free(s->target);
     free(s);
 

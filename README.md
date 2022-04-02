@@ -12,6 +12,8 @@ make install
 ### Measure execution time
 Included in the project there is an additional program *time_exec* which measures the "encryption" time. Simply put some files in a folder *data* in the project and run
 ```
+make
+make copy
 ./time_exec #
 ```
 

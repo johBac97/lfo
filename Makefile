@@ -2,7 +2,7 @@
 
 
 CC= gcc
-CFLAGS= -O2 -Wall -Wextra --pedantic-errors
+CFLAGS= -O2 -Wall -Wextra --pedantic-errors 
 
 objs = lfo time_exec
 
@@ -20,6 +20,9 @@ time_exec: src/time_exec.o
 install: all
 	mkdir -p bin
 	cp lfo bin/
+	CMD='export PATH=$$PATH:`pwd`/bin';echo "$$CMD" >> ~/.bashrc
+	CMD1='export PATH=$$PATH:';CMD2="`pwd`/bin"; echo "$$CMD1$$CMD2" >> ~/.bashrc	
+	
 
 copy:
 	cp -r data data2
